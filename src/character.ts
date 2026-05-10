@@ -12,7 +12,7 @@ export const CHARACTER_Y_OFFSET = 30; // Visual adjustment for empty space in sp
 
 // Physics Constants
 export const GRAVITY = 1800; // pixels per second per second
-export const HORIZONTAL_SPEED = 250; // pixels per second
+export const HORIZONTAL_SPEED = 275; // pixels per second
 export const JUMP_STRENGTH = -700; // pixels per second
 
 // Sprite Animation Constants
@@ -78,10 +78,16 @@ export function updateCharacter(
   // Platform collision
   onGround = false;
   for (const [index, p] of platforms.entries()) {
-    // Check for lava collision (platform 0)
-    if (index === 0 && y + CHARACTER_HEIGHT - CHARACTER_Y_OFFSET >= p.y) {
-      handleRestart();
-      return { ...prevState }; // Stop further processing for this frame
+    // Check for lava collision
+    if (
+      p.isLava && // It's a lava platform
+      y + CHARACTER_HEIGHT - CHARACTER_Y_OFFSET >= p.y && // Character's feet are below platform's top
+      y + CHARACTER_HEIGHT - CHARACTER_Y_OFFSET <= p.y + p.height && // Character's feet are above platform's bottom
+      x + CHARACTER_HITBOX_X_OFFSET + CHARACTER_HITBOX_WIDTH > p.x && // Character is horizontally overlapping
+      x + CHARACTER_HITBOX_X_OFFSET < p.x + p.width
+    ) {
+      handleRestart(); // Restart the game on lava contact
+      return { ...prevState };
     }
 
     // Is the character's bottom edge intersecting the platform's top edge?

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import characterImgAsset from './assets/merlin-idle.png';
 import characterWalkImgAsset from './assets/merlin-walk.png';
+import { CHARACTER_HEIGHT, HORIZONTAL_SPEED, GRAVITY } from './character';
 import {
   JUMP_STRENGTH,
   drawCharacter,
@@ -10,26 +11,66 @@ import {
 } from './character';
 import type { Platform } from './types';
 
-const WORLD_WIDTH = 2000; // The world is much wider than the canvas
-const platforms: Platform[] = [
-  // Ground platform spanning the entire world
-  { x: 0, y: 400 - 20, width: WORLD_WIDTH, height: 20 },
-  // Additional platforms in the world
-  { x: 200, y: 320, width: 100, height: 20 },
-  { x: 450, y: 280, width: 100, height: 20 },
-  { x: 700, y: 240, width: 100, height: 20 },
-  { x: 950, y: 200, width: 150, height: 20 },
-  { x: 1250, y: 250, width: 100, height: 20 },
-  { x: 1500, y: 200, width: 100, height: 20 },
-  { x: 1750, y: 150, width: 120, height: 20 },
-];
+
+const INITIAL_WORLD_WIDTH = 2000;
+const GROUND_Y_POSITION = 400 - 20;
+
+const generateInitialPlatforms = (): Platform[] => {
+  const platforms: Platform[] = [
+    // Ground platform spanning the entire world
+    { x: 0, y: GROUND_Y_POSITION, width: INITIAL_WORLD_WIDTH, height: 20, isLava: true },
+  ];
+
+  // Based on character physics
+  const maxJumpTime = -JUMP_STRENGTH / GRAVITY;
+  const maxJumpHeight = (-JUMP_STRENGTH * maxJumpTime) + (0.5 * GRAVITY * maxJumpTime * maxJumpTime);
+  const maxJumpDistance = HORIZONTAL_SPEED * (maxJumpTime * 2);
+
+  let lastPlatform = { x: 200, y: 320, width: 100 };
+  platforms.push({ ...lastPlatform, height: 20, isLava: false });
+
+  let currentX = lastPlatform.x + lastPlatform.width;
+
+  while (currentX < INITIAL_WORLD_WIDTH - 300) { // Leave some space at the end
+    const gap = Math.random() * (maxJumpDistance * 0.7) + 30; // 30px min gap
+    const nextX = currentX + gap;
+
+    const yDiff = Math.random() * (maxJumpHeight * 0.8);
+    const nextY = Math.max(150, Math.min(GROUND_Y_POSITION - CHARACTER_HEIGHT, lastPlatform.y - yDiff + Math.random() * 100));
+
+    const width = 80 + Math.random() * 70;
+    const newPlatform = { x: nextX, y: nextY, width, height: 20, isLava: false };
+    platforms.push(newPlatform);
+    currentX = newPlatform.x + newPlatform.width;
+  }
+
+  return platforms;
+};
 
 const lavaVideoAsset = 'https://example.com/lava.mp4'; // Replace with your direct video link
+
 interface GameCanvasProps {
   setLastPressedKey: (key: string | null) => void;
   restartCounter: number;
   handleRestart: () => void;
 }
+
+const generatePlatforms = (startX: number): Platform[] => {
+  const newPlatforms: Platform[] = [];
+  const numberOfPlatforms = Math.floor(Math.random() * 3) + 1; // Generate 1 to 3 platforms
+  let lastPlatformX = startX;
+
+  for (let i = 0; i < numberOfPlatforms; i++) {
+    // Set a gap from the last generated platform
+    const gap = i === 0 ? 200 + Math.random() * 150 : 100 + Math.random() * 100;
+    const x = lastPlatformX + gap;
+    const y = 150 + Math.random() * 200; // Random height from 150 to 350
+    const width = 80 + Math.random() * 70; // Random width from 80 to 150
+    newPlatforms.push({ x, y, width, height: 20, isLava: false });
+    lastPlatformX = x + width;
+  }
+  return newPlatforms;
+};
 
 const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCounter, handleRestart }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -40,6 +81,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
   const [lavaVideo, setLavaVideo] = useState<HTMLVideoElement | null>(null);
   const [lavaPattern, setLavaPattern] = useState<CanvasPattern | null>(null);
   const [characterState, setCharacterState] = useState(initialCharacterState);
+  const [platforms, setPlatforms] = useState<Platform[]>(generateInitialPlatforms());
+  const [worldWidth, setWorldWidth] = useState(INITIAL_WORLD_WIDTH);
+  const lastGeneratedPlatformX = useRef(1250);
   const lastTimeRef = useRef<number | null>(null);
   const keysPressed = useRef<Set<string>>(new Set());
 
@@ -85,10 +129,45 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
     if (restartCounter > 0) {
       setCharacterState(initialCharacterState);
       setCameraX(0);
+      setPlatforms(generateInitialPlatforms());
+      setWorldWidth(INITIAL_WORLD_WIDTH);
+      lastGeneratedPlatformX.current = 1250;
       lastTimeRef.current = null;
       keysPressed.current.clear();
     }
   }, [restartCounter]);
+
+  // Effect for lava platforms
+  useEffect(() => {
+    const lavaInterval = setInterval(() => {
+      setPlatforms(currentPlatforms => {
+        const nonLavaPlatforms = currentPlatforms
+          .map((p, i) => ({ p, i }))
+          .filter(item => !item.p.isLava);
+
+        if (nonLavaPlatforms.length === 0) {
+          return currentPlatforms;
+        }
+
+        const randomIndex = Math.floor(Math.random() * nonLavaPlatforms.length);
+        const platformToChangeIndex = nonLavaPlatforms[randomIndex].i;
+
+        setTimeout(() => {
+          setPlatforms(prev =>
+            prev.map((p, i) =>
+              i === platformToChangeIndex ? { ...p, isLava: false } : p
+            )
+          );
+        }, 2000 + Math.random() * 1000); // Turn back to normal after 2-3 seconds
+
+        return currentPlatforms.map((p, i) =>
+          i === platformToChangeIndex ? { ...p, isLava: true } : p
+        );
+      });
+    }, 3000); // Every 3 seconds, a platform might turn to lava
+
+    return () => clearInterval(lavaInterval);
+  }, []);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     setLastPressedKey(e.key);
@@ -120,14 +199,27 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
       lastTimeRef.current = currentTime;
 
       setCharacterState(prevState => {
-        const newState = updateCharacter(prevState, keysPressed.current, { deltaTime, currentTime }, platforms, WORLD_WIDTH, handleRestart);
+        const newState = updateCharacter(prevState, keysPressed.current, { deltaTime, currentTime }, platforms, worldWidth, handleRestart);
+
+        // Generate new platforms if character is near the edge of the generated world
+        if (newState.x > lastGeneratedPlatformX.current - canvasSize.width) {
+          const newPlatforms = generatePlatforms(lastGeneratedPlatformX.current);
+          lastGeneratedPlatformX.current = newPlatforms[newPlatforms.length - 1].x;
+          
+          setPlatforms(prevPlatforms => {
+            const ground = { ...prevPlatforms[0], width: worldWidth + 500 };
+            return [ground, ...prevPlatforms.slice(1), ...newPlatforms];
+          });
+
+          setWorldWidth(prev => prev + 500);
+        }
 
         // Target for the camera is to have the player in the middle of the screen
         const targetCameraX = newState.x - (canvasSize.width / 2);
 
         // Clamp camera to world bounds
         let newCameraX = Math.max(0, targetCameraX); // Don't go past the left edge
-        newCameraX = Math.min(newCameraX, WORLD_WIDTH - canvasSize.width); // Don't go past the right edge
+        newCameraX = Math.min(newCameraX, worldWidth - canvasSize.width); // Don't go past the right edge
         setCameraX(newCameraX);
         
         return newState;
@@ -146,9 +238,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      cancelAnimationFrame(animationFrameId);
     };
-  }, [handleKeyDown, handleKeyUp, characterImg, characterWalkImg, handleRestart]);
+  }, [handleKeyDown, handleKeyUp, characterImg, characterWalkImg, handleRestart, platforms, worldWidth, canvasSize.width]);
 
   // Drawing Effect
   useEffect(() => {
@@ -176,9 +268,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
 
     // Draw platforms
     platforms.forEach((p, index) => {
-      if (index === 0 && lavaPattern) {
+      if (p.isLava && lavaPattern) {
         context.fillStyle = lavaPattern;
-      } else if (index === 0) {
+      } else if (p.isLava) {
         context.fillStyle = '#FF4500'; // Fallback fiery orange for lava
       } else {
         context.fillStyle = 'purple';
@@ -189,7 +281,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
     drawCharacter(context, characterState, characterImg, characterWalkImg);
 
     context.restore();
-  }, [characterState, characterImg, characterWalkImg, cameraX, lavaVideo, lavaPattern, canvasSize]);
+  }, [characterState, characterImg, characterWalkImg, cameraX, lavaVideo, lavaPattern, canvasSize, platforms]);
 
   return <canvas ref={canvasRef} width={canvasSize.width} height={canvasSize.height} />;
 };
