@@ -12,6 +12,8 @@ const SPRITE_SHEET_FRAME_HEIGHT = 256; // Height of a single frame
 const CHARACTER_ASPECT_RATIO = SPRITE_SHEET_FRAME_WIDTH / SPRITE_SHEET_FRAME_HEIGHT;
 const CHARACTER_WIDTH = 100;
 const CHARACTER_HEIGHT = CHARACTER_WIDTH * CHARACTER_ASPECT_RATIO;
+const CHARACTER_HITBOX_WIDTH = 25; // The actual width of the character for collision
+const CHARACTER_HITBOX_X_OFFSET = (CHARACTER_WIDTH - CHARACTER_HITBOX_WIDTH) / 2;
 const CHARACTER_Y_OFFSET = 15; // Visual adjustment for empty space in sprite
 
 // Physics Constants
@@ -29,13 +31,13 @@ const platforms = [
   // Ground platform spanning the entire world
   { x: 0, y: CANVAS_HEIGHT - 20, width: WORLD_WIDTH, height: 20 },
   // Additional platforms in the world
-  { x: 150, y: 320, width: 100, height: 20 },
-  { x: 300, y: 280, width: 100, height: 20 },
-  { x: 450, y: 240, width: 100, height: 20 },
-  { x: 650, y: 200, width: 150, height: 20 },
-  { x: 900, y: 250, width: 100, height: 20 },
-  { x: 1100, y: 200, width: 100, height: 20 },
-  { x: 1300, y: 150, width: 120, height: 20 },
+  { x: 200, y: 320, width: 100, height: 20 },
+  { x: 450, y: 280, width: 100, height: 20 },
+  { x: 700, y: 240, width: 100, height: 20 },
+  { x: 950, y: 200, width: 150, height: 20 },
+  { x: 1250, y: 250, width: 100, height: 20 },
+  { x: 1500, y: 200, width: 100, height: 20 },
+  { x: 1750, y: 150, width: 120, height: 20 },
 ];
 
 interface GameCanvasProps {
@@ -168,10 +170,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
 
           // Is the character's bottom edge intersecting the platform's top edge?
           if (
-            y + CHARACTER_HEIGHT - CHARACTER_Y_OFFSET >= p.y &&
-            y + CHARACTER_HEIGHT - CHARACTER_Y_OFFSET <= p.y + p.height &&
-            x + CHARACTER_WIDTH > p.x &&
-            x < p.x + p.width &&
+            y + CHARACTER_HEIGHT >= p.y && // Character's visual bottom is at or below platform top
+            y + CHARACTER_HEIGHT - CHARACTER_Y_OFFSET <= p.y + p.height && // Character's feet are not past the bottom of the platform
+            x + CHARACTER_HITBOX_X_OFFSET + CHARACTER_HITBOX_WIDTH > p.x && // Character's right hitbox edge is past platform's left edge
+            x + CHARACTER_HITBOX_X_OFFSET < p.x + p.width && // Character's left hitbox edge is not past platform's right edge
             vy >= 0
           ) {
             vy = 0; // Stop vertical movement
@@ -188,10 +190,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
         let newCameraX = Math.max(0, targetCameraX); // Don't go past the left edge
         newCameraX = Math.min(newCameraX, WORLD_WIDTH - CANVAS_WIDTH); // Don't go past the right edge
         setCameraX(newCameraX);
-
-        return { x, y, vy, onGround, isMoving, direction };
+        
+        return { x, y, vy, onGround, isMoving, direction};
       });
-
+      
       animationFrameId = requestAnimationFrame(gameLoop);
     };
 
