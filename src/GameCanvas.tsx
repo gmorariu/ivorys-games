@@ -100,15 +100,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     setLastPressedKey(e.key);
+    if (e.key === ' ' && characterState.onGround && !keysPressed.current.has(' ')) {
+      setCharacterState(prevState => ({ ...prevState, vy: JUMP_STRENGTH, onGround: false }));
+    }
+
     if (['a', 'd', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
       e.preventDefault();
       keysPressed.current.add(e.key); // Handle movement as a continuous press
     }
-
-    if (e.key === ' ' && characterState.onGround) {
-      setCharacterState(prevState => ({ ...prevState, vy: JUMP_STRENGTH, onGround: false }));
-    }
-  }, [setLastPressedKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setLastPressedKey, characterState.onGround]);
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     keysPressed.current.delete(e.key);
@@ -232,7 +233,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
       if (index === 0) {
         context.fillStyle = '#FF4500'; // Fiery orange for lava
       } else {
-        context.fillStyle = '#8B4513'; // A brownish color for platforms
+        context.fillStyle = 'green';
       }
       context.fillRect(p.x, p.y, p.width, p.height);
     });
