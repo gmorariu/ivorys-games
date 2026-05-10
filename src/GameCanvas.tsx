@@ -71,6 +71,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
   const [characterImg, setCharacterImg] = useState<HTMLImageElement | null>(null);
   const [characterWalkImg, setCharacterWalkImg] = useState<HTMLImageElement | null>(null);
   const [lavaImg, setLavaImg] = useState<HTMLImageElement | null>(null);
+  const [backgroundImg, setBackgroundImg] = useState<HTMLImageElement | null>(null);
   const [lavaPattern, setLavaPattern] = useState<CanvasPattern | null>(null);
   const [characterState, setCharacterState] = useState(initialCharacterState);
   const [animationFrame, setAnimationFrame] = useState(0);
@@ -91,6 +92,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
     const newLavaImg = new Image();
     newLavaImg.src = lavaImgAsset;
     newLavaImg.onload = () => setLavaImg(newLavaImg); // eslint-disable-line no-confusing-void-expression
+
+    const bgImg = new Image();
+    bgImg.src =
+      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5xjmlG0k68d3COggnLE1ohjZBjSAk3wofjw&s';
+    bgImg.onload = () => setBackgroundImg(bgImg);
   }, []);
 
   // Effect for restarting the game
@@ -242,7 +248,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
     // Clear canvas
     context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Translate the canvas to simulate the camera
+    // Draw background with parallax scrolling
+    if (backgroundImg) {
+      const parallaxFactor = 0.5;
+      const bgX = -cameraX * parallaxFactor;
+      const bgPattern = context.createPattern(backgroundImg, 'repeat-x');
+      if (bgPattern) {
+        context.fillStyle = bgPattern;
+        context.translate(bgX, 0);
+        context.fillRect(-bgX, 0, CANVAS_WIDTH - bgX, CANVAS_HEIGHT);
+        context.translate(-bgX, 0);
+      }
+    }
+
     context.translate(-cameraX, 0);
 
     // Draw platforms
@@ -284,7 +302,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ setLastPressedKey, restartCount
     }
 
     context.restore();
-  }, [characterState, characterImg, characterWalkImg, cameraX, animationFrame, lavaImg, lavaPattern]);
+  }, [characterState, characterImg, characterWalkImg, cameraX, animationFrame, lavaImg, lavaPattern, backgroundImg]);
 
   return <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />;
 };
